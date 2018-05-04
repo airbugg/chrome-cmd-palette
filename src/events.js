@@ -1,0 +1,4 @@
+export const EVENTS = {
+  GET_TABS: 'GET_TABS',
+  TOGGLE_PALETTE: 'TOGGLE_PALETTE'
+}

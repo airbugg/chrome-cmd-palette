@@ -1,0 +1,30 @@
+{
+  "manifest_version": 2,
+  "name": "chrome-cmd-palette",
+  "version": "0.0.0",
+  "permissions": ["tabs"],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "chrome-cmd-palette",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "css": ["static/css/content.css"],
+      "js": ["content.js"]
+    }
+  ],
+  "commands": {
+    "Command+Shift+A": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "Command+Shift+A"
+    }
+  }
+}

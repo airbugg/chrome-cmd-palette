@@ -3,29 +3,22 @@ port module Main exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Json.Decode as Json
+import Json.Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (..)
+import Json.Encode exposing (..)
 import Keyboard exposing (..)
-
-
--- type alias GenericOutsideData =
---     { tag : String, data : Json.Encode.Value }
--- port sendEvent : GenericOutsideData -> Cmd msg
-
-
-port consumeEvent : (() -> msg) -> Sub msg
-
 
 
 ---- MODEL ----
 
 
 type alias Model =
-    { showPalette : Bool, searchField : String }
+    { showPalette : Bool, searchField : String, error : Maybe String, tabs : List String }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { showPalette = False, searchField = "" }, Cmd.none )
+    ( { showPalette = False, searchField = "", error = Nothing, tabs = [] }, Cmd.none )
 
 
 
@@ -37,6 +30,8 @@ type Msg
     | TogglePalette
     | ClosePalette
     | UpdateField String
+    | GetTabs (List String)
+    | HandleResponseError (Maybe String)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -57,6 +52,53 @@ update msg model =
             { model | searchField = str }
                 ! []
 
+        GetTabs tabs ->
+            { model | tabs = tabs } ! []
+
+        HandleResponseError errStr ->
+            { model | error = errStr } ! []
+
+
+
+---- PORTS ----
+
+
+type alias IncomingAction =
+    { actionType : String, payload : Json.Encode.Value }
+
+
+port consumeResponse : (Json.Decode.Value -> msg) -> Sub msg
+
+
+decodeResponse : Json.Decode.Value -> Msg
+decodeResponse json =
+    case Json.Decode.decodeValue incomingActionDecoder json of
+        Err err ->
+            HandleResponseError (Just err)
+
+        Ok incomingAction ->
+            case incomingAction.actionType of
+                "TOGGLE_PALETTE" ->
+                    TogglePalette
+
+                "GET_TABS" ->
+                    case Json.Decode.decodeValue (Json.Decode.list Json.Decode.string) incomingAction.payload of
+                        Err err ->
+                            HandleResponseError (Just err)
+
+                        Ok tabs ->
+                            GetTabs tabs
+
+                _ ->
+                    NoOp
+
+
+incomingActionDecoder : Decoder IncomingAction
+incomingActionDecoder =
+    decode IncomingAction
+        |> Json.Decode.Pipeline.required "actionType" Json.Decode.string
+        |> Json.Decode.Pipeline.required "payload" Json.Decode.value
+
 
 
 ---- VIEW ----
@@ -75,15 +117,20 @@ view model =
                 , onInput UpdateField
                 ]
                 []
+            , div [ class "command-palette" ] (List.map Html.text model.tabs)
             ]
     else
         Html.text ""
 
 
+
+---- SUBSCRIPTIONS ----
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ consumeEvent (\_ -> TogglePalette)
+        [ consumeResponse decodeResponse
         , downs
             (\code ->
                 if code == 27 then

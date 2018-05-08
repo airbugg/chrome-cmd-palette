@@ -5,8 +5,19 @@ import { EVENTS } from './events'
 const app = Main.embed(document.body.appendChild(document.createElement('div')))
 
 chrome.runtime.onMessage.addListener((request, sender) => {
-  console.log('request received, yo', request, sender)
-  if (request.kind === EVENTS.TOGGLE_PALETTE) {
-    app.ports.consumeEvent.send(null)
+  if (request.actionType === EVENTS.TOGGLE_PALETTE) {
+    console.log(request, sender)
+
+    app.ports.consumeResponse.send({
+      actionType: EVENTS.TOGGLE_PALETTE,
+      payload: []
+    })
+  }
+  if (request.actionType === EVENTS.GET_TABS) {
+    console.log(request, sender)
+    app.ports.consumeResponse.send({
+      actionType: EVENTS.GET_TABS,
+      payload: request.payload
+    })
   }
 })

@@ -1,0 +1,61 @@
+{
+  "alfredtheme" : {
+    "result" : {
+      "textSpacing" : 4,
+      "subtext" : {
+        "size" : 11,
+        "colorSelected" : "#FFFFFFC4",
+        "font" : "System Light",
+        "color" : "#6E737DFF"
+      },
+      "shortcut" : {
+        "size" : 16,
+        "colorSelected" : "#FFFFFFFF",
+        "font" : "System Light",
+        "color" : "#A5A8A6FF"
+      },
+      "backgroundSelected" : "#52A2FCFF",
+      "text" : {
+        "size" : 18,
+        "colorSelected" : "#FFFFFFFF",
+        "font" : "System Light",
+        "color" : "#585A59FF"
+      },
+      "iconPaddingHorizontal" : 8,
+      "paddingVertical" : 5,
+      "iconSize" : 34
+    },
+    "search" : {
+      "paddingVertical" : 0,
+      "background" : "#00000000",
+      "spacing" : 6,
+      "text" : {
+        "size" : 28,
+        "colorSelected" : "#000000FF",
+        "font" : "System Light",
+        "color" : "#020302FF"
+      },
+      "backgroundSelected" : "#B2D7FFFF"
+    },
+    "window" : {
+      "color" : "#EFEFF1EA",
+      "paddingHorizontal" : 0,
+      "width" : 600,
+      "borderPadding" : 0,
+      "borderColor" : "#E4E6E9FF",
+      "blur" : 40,
+      "roundness" : 7,
+      "paddingVertical" : 6
+    },
+    "credit" : "Eugene Lerman",
+    "separator" : {
+      "color" : "#DADADCFF",
+      "thickness" : 1
+    },
+    "scrollbar" : {
+      "color" : "#F4F4F3FF",
+      "thickness" : 2
+    },
+    "name" : "Launchbar-esque"
+  }
+}

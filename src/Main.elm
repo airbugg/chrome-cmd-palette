@@ -1,5 +1,6 @@
 port module Main exposing (..)
 
+import Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -7,18 +8,19 @@ import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (..)
 import Json.Encode exposing (..)
 import Keyboard exposing (..)
+import Task
 
 
 ---- MODEL ----
 
 
 type alias Model =
-    { showPalette : Bool, searchField : String, error : Maybe String, tabs : List String }
+    { showPalette : Bool, filterField : String, error : Maybe String, suggestions : List String }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { showPalette = False, searchField = "", error = Nothing, tabs = [] }, Cmd.none )
+    ( { showPalette = False, filterField = "", error = Nothing, suggestions = [] }, encodeRequest RequestSuggestions )
 
 
 
@@ -29,9 +31,11 @@ type Msg
     = NoOp
     | TogglePalette
     | ClosePalette
-    | UpdateField String
-    | GetTabs (List String)
+    | UpdateFilter String
+    | FocusResult (Result Dom.Error ())
+    | UpdateSuggestions (List String)
     | HandleResponseError (Maybe String)
+    | HandleRequest OutgoingAction
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -40,20 +44,33 @@ update msg model =
         NoOp ->
             model ! []
 
+        HandleRequest action ->
+            case action of
+                RequestSuggestions ->
+                    model ! [ encodeRequest RequestSuggestions ]
+
         TogglePalette ->
             { model | showPalette = not model.showPalette }
-                ! []
+                ! [ Task.attempt FocusResult (Dom.focus "command-palette-input") ]
 
         ClosePalette ->
             { model | showPalette = False }
                 ! []
 
-        UpdateField str ->
-            { model | searchField = str }
+        UpdateFilter str ->
+            { model | filterField = str }
                 ! []
 
-        GetTabs tabs ->
-            { model | tabs = tabs } ! []
+        FocusResult result ->
+            case result of
+                Err (Dom.NotFound id) ->
+                    model ! []
+
+                Ok () ->
+                    model ! []
+
+        UpdateSuggestions suggestions ->
+            { model | suggestions = suggestions } ! []
 
         HandleResponseError errStr ->
             { model | error = errStr } ! []
@@ -63,11 +80,33 @@ update msg model =
 ---- PORTS ----
 
 
-type alias IncomingAction =
+type OutgoingAction
+    = RequestSuggestions
+
+
+type alias Action =
     { actionType : String, payload : Json.Encode.Value }
 
 
+
+-- Incoming
+
+
 port consumeResponse : (Json.Decode.Value -> msg) -> Sub msg
+
+
+
+-- Outgoing
+
+
+port sendRequest : Action -> Cmd msg
+
+
+encodeRequest : OutgoingAction -> Cmd msg
+encodeRequest action =
+    case action of
+        RequestSuggestions ->
+            sendRequest { actionType = "REQUEST_SUGGESTIONS", payload = Json.Encode.null }
 
 
 decodeResponse : Json.Decode.Value -> Msg
@@ -81,21 +120,21 @@ decodeResponse json =
                 "TOGGLE_PALETTE" ->
                     TogglePalette
 
-                "GET_TABS" ->
+                "SUGGESTIONS_UPDATED" ->
                     case Json.Decode.decodeValue (Json.Decode.list Json.Decode.string) incomingAction.payload of
                         Err err ->
                             HandleResponseError (Just err)
 
-                        Ok tabs ->
-                            GetTabs tabs
+                        Ok suggestions ->
+                            UpdateSuggestions suggestions
 
                 _ ->
                     NoOp
 
 
-incomingActionDecoder : Decoder IncomingAction
+incomingActionDecoder : Decoder Action
 incomingActionDecoder =
-    decode IncomingAction
+    decode Action
         |> Json.Decode.Pipeline.required "actionType" Json.Decode.string
         |> Json.Decode.Pipeline.required "payload" Json.Decode.value
 
@@ -107,17 +146,22 @@ incomingActionDecoder =
 view : Model -> Html Msg
 view model =
     if model.showPalette then
-        div [ class "command-palette" ]
+        div [ classList [ ( "command-palette", True ), ( "empty", List.isEmpty model.suggestions ) ] ]
             [ input
                 [ class "command-palette-input"
                 , placeholder "Start typing to search..."
+                , id "command-palette-input"
                 , autofocus True
-                , value model.searchField
+                , value model.filterField
                 , name "newTodo"
-                , onInput UpdateField
+                , onInput UpdateFilter
                 ]
                 []
-            , div [ class "command-palette" ] (List.map Html.text model.tabs)
+            , div [ class "suggestions" ]
+                (model.suggestions
+                    |> List.filter (\suggestion -> String.contains (String.toLower model.filterField) (String.toLower suggestion))
+                    |> List.map (\tab -> div [ class "suggestion" ] [ p [] [ text tab ] ])
+                )
             ]
     else
         Html.text ""

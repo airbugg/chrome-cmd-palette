@@ -8,6 +8,7 @@ import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (..)
 import Json.Encode exposing (..)
 import Keyboard exposing (..)
+import Mouse
 import Task
 
 
@@ -30,7 +31,7 @@ init =
 type Msg
     = NoOp
     | TogglePalette
-    | ClosePalette
+    | Blur
     | UpdateFilter String
     | FocusResult (Result Dom.Error ())
     | UpdateSuggestions (List String)
@@ -53,7 +54,7 @@ update msg model =
             { model | showPalette = not model.showPalette }
                 ! [ Task.attempt FocusResult (Dom.focus "command-palette-input") ]
 
-        ClosePalette ->
+        Blur ->
             { model | showPalette = False }
                 ! []
 
@@ -178,10 +179,14 @@ subscriptions model =
         , downs
             (\code ->
                 if code == 27 then
-                    ClosePalette
+                    Blur
                 else
                     NoOp
             )
+        , if model.showPalette then
+            Mouse.clicks (always Blur)
+          else
+            Sub.none
         ]
 
 

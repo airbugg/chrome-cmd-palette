@@ -1,3 +1,7 @@
 {
-  "eslint.autoFixOnSave": true
+  "eslint.autoFixOnSave": true,
+  "sasslint.enable": true,
+  "sasslint.run": "onSave",
+  "prettier.stylelintIntegration": false,
+  "elm.analyseEnabled": true
 }

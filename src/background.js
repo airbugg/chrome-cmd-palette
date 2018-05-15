@@ -4,7 +4,14 @@ import { EVENTS } from './events'
 
 const getAllTabs = () =>
   new Promise((resolve, reject) => {
-    chrome.tabs.query({}, tabs => resolve(tabs.map(({ title }) => title)))
+    chrome.tabs.query({}, tabs =>
+      resolve(
+        tabs.map(({ title, favIconUrl }) => ({
+          title,
+          favIconUrl: favIconUrl || ''
+        }))
+      )
+    )
   })
 
 // chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

@@ -16,12 +16,28 @@ import Task
 
 
 type alias Model =
-    { showPalette : Bool, filterField : String, error : Maybe String, suggestions : List String }
+    { showPalette : Bool
+    , filterField : String
+    , error : Maybe String
+    , suggestions : List Suggestion
+    }
+
+
+type alias Suggestion =
+    { title : String
+    , favIconUrl : String
+    }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { showPalette = False, filterField = "", error = Nothing, suggestions = [] }, encodeRequest RequestSuggestions )
+    ( { showPalette = False
+      , filterField = ""
+      , error = Nothing
+      , suggestions = []
+      }
+    , encodeRequest RequestSuggestions
+    )
 
 
 
@@ -31,10 +47,11 @@ init =
 type Msg
     = NoOp
     | TogglePalette
+    | ResetFilter
     | Blur
     | UpdateFilter String
     | FocusResult (Result Dom.Error ())
-    | UpdateSuggestions (List String)
+    | UpdateSuggestions (List Suggestion)
     | HandleResponseError (Maybe String)
     | HandleRequest OutgoingAction
 
@@ -61,6 +78,9 @@ update msg model =
         UpdateFilter str ->
             { model | filterField = str }
                 ! []
+
+        ResetFilter ->
+            { model | filterField = "" } ! []
 
         FocusResult result ->
             case result of
@@ -122,7 +142,7 @@ decodeResponse json =
                     TogglePalette
 
                 "SUGGESTIONS_UPDATED" ->
-                    case Json.Decode.decodeValue (Json.Decode.list Json.Decode.string) incomingAction.payload of
+                    case Json.Decode.decodeValue (Json.Decode.list suggestionDecoder) incomingAction.payload of
                         Err err ->
                             HandleResponseError (Just err)
 
@@ -131,6 +151,13 @@ decodeResponse json =
 
                 _ ->
                     NoOp
+
+
+suggestionDecoder : Decoder Suggestion
+suggestionDecoder =
+    decode Suggestion
+        |> Json.Decode.Pipeline.required "title" Json.Decode.string
+        |> Json.Decode.Pipeline.required "favIconUrl" Json.Decode.string
 
 
 incomingActionDecoder : Decoder Action
@@ -154,18 +181,32 @@ view model =
                 , id "command-palette-input"
                 , autofocus True
                 , value model.filterField
-                , name "newTodo"
+                , name "command-palette-input"
                 , onInput UpdateFilter
                 ]
                 []
             , div [ class "suggestions" ]
                 (model.suggestions
-                    |> List.filter (\suggestion -> String.contains (String.toLower model.filterField) (String.toLower suggestion))
-                    |> List.map (\tab -> div [ class "suggestion" ] [ p [] [ text tab ] ])
+                    |> List.filter (\{ title, favIconUrl } -> String.contains (String.toLower model.filterField) (String.toLower title))
+                    |> List.map (\suggestion -> div [ class "suggestion" ] [ viewIcon suggestion, p [] [ text suggestion.title ] ])
                 )
             ]
     else
         Html.text ""
+
+
+viewIcon : Suggestion -> Html Msg
+viewIcon suggestion =
+    span [ class "icon-container" ]
+        [ img [ src (getIcon suggestion.favIconUrl) ] [] ]
+
+
+getIcon : String -> String
+getIcon iconUrl =
+    if String.isEmpty iconUrl then
+        boomarkDataUri
+    else
+        iconUrl
 
 
 

@@ -19,12 +19,12 @@
     }
   ],
   "commands": {
-    "Command+Shift+A": {
+    "Command+Shift+P": {
       "suggested_key": {
-        "default": "Ctrl+Shift+A",
-        "mac": "Command+Shift+A"
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
       },
-      "description": "Command+Shift+A"
+      "description": "Command+Shift+P"
     }
   }
 }

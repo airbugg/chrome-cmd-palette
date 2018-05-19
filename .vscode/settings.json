@@ -3,5 +3,8 @@
   "sasslint.enable": true,
   "sasslint.run": "onSave",
   "prettier.stylelintIntegration": false,
-  "elm.analyseEnabled": true
+  "elm.analyseEnabled": true,
+  "[elm]": {
+    "editor.formatOnSave": true
+  }
 }

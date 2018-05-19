@@ -7,7 +7,7 @@ import Html.Events exposing (..)
 import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (..)
 import Json.Encode exposing (..)
-import Keyboard exposing (..)
+import Keyboard
 import Mouse
 import Task
 
@@ -20,12 +20,13 @@ type alias Model =
     , filterField : String
     , error : Maybe String
     , suggestions : List Suggestion
-    , selectedId : Int
+    , selectedId : Maybe Int
     }
 
 
 type alias Suggestion =
-    { title : String
+    { id : Int
+    , title : String
     , favIconUrl : String
     }
 
@@ -41,7 +42,7 @@ init =
       , filterField = ""
       , error = Nothing
       , suggestions = []
-      , selectedId = 0
+      , selectedId = Just 0
       }
     , encodeRequest RequestSuggestions
     )
@@ -49,6 +50,36 @@ init =
 
 
 ---- UPDATE ----
+
+
+getPreviousItemId : List Int -> Int -> Int
+getPreviousItemId ids selectedId =
+    Maybe.withDefault selectedId <| List.foldr (getPrevious selectedId) Nothing ids
+
+
+getPrevious : Int -> Int -> Maybe Int -> Maybe Int
+getPrevious id selectedId resultId =
+    if selectedId == id then
+        Just id
+    else if Maybe.withDefault 0 resultId == id then
+        Just selectedId
+    else
+        resultId
+
+
+getNextItemId : List Int -> Int -> Int
+getNextItemId ids selectedId =
+    Maybe.withDefault selectedId <| List.foldl (getPrevious selectedId) Nothing ids
+
+
+navigateWithKey : ArrowKey -> List Int -> Maybe Int -> Maybe Int
+navigateWithKey code ids maybeId =
+    case code of
+        Up ->
+            Maybe.map (getPreviousItemId ids) maybeId
+
+        Down ->
+            Maybe.map (getNextItemId ids) maybeId
 
 
 type Msg
@@ -84,12 +115,10 @@ update msg model =
                 ! []
 
         KeyDown key ->
-            case key of
-                Up ->
-                    { model | selectedId = model.selectedId + 1 } ! []
-
-                Down ->
-                    { model | selectedId = model.selectedId - 1 } ! []
+            { model
+                | selectedId = navigateWithKey key (List.map (\x -> x.id) model.suggestions) model.selectedId
+            }
+                ! []
 
         UpdateFilter str ->
             { model | filterField = str }
@@ -172,6 +201,7 @@ decodeResponse json =
 suggestionDecoder : Decoder Suggestion
 suggestionDecoder =
     decode Suggestion
+        |> Json.Decode.Pipeline.required "id" Json.Decode.int
         |> Json.Decode.Pipeline.required "title" Json.Decode.string
         |> Json.Decode.Pipeline.required "favIconUrl" Json.Decode.string
 
@@ -188,13 +218,13 @@ incomingActionDecoder =
 
 
 viewInput : Model -> Html Msg
-viewInput model =
+viewInput { filterField } =
     input
         [ class "command-palette-input"
         , placeholder "Start typing to search..."
         , id "command-palette-input"
         , autofocus True
-        , value model.filterField
+        , value filterField
         , name "command-palette-input"
         , onInput UpdateFilter
         ]
@@ -202,26 +232,26 @@ viewInput model =
 
 
 viewSuggestions : Model -> Html Msg
-viewSuggestions model =
+viewSuggestions { suggestions, filterField, selectedId } =
     div [ class "suggestions" ]
-        (model.suggestions
-            |> List.filter (\{ title, favIconUrl } -> String.contains (String.toLower model.filterField) (String.toLower title))
-            |> List.map viewSuggestion
+        (suggestions
+            |> List.filter (\{ title, favIconUrl } -> String.contains (String.toLower filterField) (String.toLower title))
+            |> List.map (viewSuggestion selectedId)
         )
 
 
-viewSuggestion : Suggestion -> Html Msg
-viewSuggestion suggestion =
-    div [ class "suggestion" ]
+viewSuggestion : Maybe Int -> Suggestion -> Html Msg
+viewSuggestion selectedId suggestion =
+    div [ classList [ ( "suggestion", True ), ( "selected", suggestion.id == Maybe.withDefault 0 selectedId ) ] ]
         [ viewIcon suggestion
         , p [] [ text suggestion.title ]
         ]
 
 
 viewIcon : Suggestion -> Html Msg
-viewIcon suggestion =
+viewIcon { favIconUrl } =
     span [ class "icon-container" ]
-        [ img [ src (getIcon suggestion.favIconUrl) ] [] ]
+        [ img [ src (getIcon favIconUrl) ] [] ]
 
 
 getIcon : String -> String
@@ -251,7 +281,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ consumeResponse decodeResponse
-        , downs
+        , Keyboard.downs
             (\code ->
                 case code of
                     27 ->
@@ -265,10 +295,6 @@ subscriptions model =
 
                     _ ->
                         NoOp
-             -- if code == 27 then
-             --     Blur
-             -- else
-             --     NoOp
             )
         , if model.showPalette then
             Mouse.clicks (always Blur)

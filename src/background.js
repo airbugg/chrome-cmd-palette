@@ -1,67 +1,59 @@
 import { EVENTS } from './events'
+import { actionFactory } from './actions'
 
-// const getAllTabs = pify(chrome.tabs.query, { errorFirst: false })
+const ports = new Map()
+const actions = actionFactory(chrome)
 
-const getAllTabs = () =>
-  new Promise((resolve, reject) => {
-    chrome.tabs.query({}, tabs =>
-      resolve(
-        tabs.map(({ title, favIconUrl }) => ({
-          title,
-          favIconUrl: favIconUrl || ''
-        }))
-      )
-    )
-  })
+chrome.runtime.onConnect.addListener(port => {
+  const tabId = port.sender.tab.id
 
-// chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-//   console.log('background script request received', request)
-//   if (request.actionType === 'REQUEST_SUGGESTIONS') {
-//     getAllTabs().then(allTabs =>
-//       sendResponse({
-//         actionType: EVENTS.GET_TABS,
-//         payload: allTabs
-//       })
-//     )
-//   }
-//   // handle response async
-//   return true
-// })
-let ports = new Set()
+  ports.set(tabId, port)
 
-chrome.runtime.onConnect.addListener(newPort => {
-  ports.add(newPort)
-  console.log('background script onConnect.addListener', newPort)
+  port.onMessage.addListener(({ actionType, payload }) => {
+    switch (actionType) {
+      case 'REQUEST_SUGGESTIONS':
+        actions.getAllTabs().then(allTabs =>
+          port.postMessage({
+            actionType: EVENTS.SUGGESTIONS_UPDATED,
+            payload: allTabs
+          })
+        )
+        break
 
-  newPort.onMessage.addListener(request => {
-    console.log('background script port.onMessage.addListener', request)
-
-    if (request.actionType === 'REQUEST_SUGGESTIONS') {
-      getAllTabs().then(allTabs =>
-        newPort.postMessage({
-          actionType: EVENTS.SUGGESTIONS_UPDATED,
-          payload: allTabs
-        })
-      )
+      default:
+        break
     }
   })
-  newPort.onDisconnect.addListener(() => {
-    ports.delete(newPort)
+
+  port.onDisconnect.addListener(() => {
+    ports.delete(tabId)
   })
 })
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  const port = sender.tab && ports.get(sender.tab.id)
+  if (port) {
+    port.postMessage(message)
+  }
+})
+
+chrome.tabs.onRemoved.addListener(tabId => {
+  ports.delete(tabId)
+})
+
+chrome.tabs.onReplaced.addListener((newTabId, oldTabId) => {
+  ports.delete(oldTabId)
+})
+
 // Add Cmd + Shift + A listener
 chrome.commands.onCommand.addListener(() => {
-  console.log('background script commands.onCommand.addListener', ports)
-
-  ports.forEach(port => port.postMessage({ actionType: EVENTS.TOGGLE_PALETTE }))
+  chrome.windows.getCurrent(window => {
+    chrome.tabs.getAllInWindow(window.id, tabs => {
+      tabs.forEach(tab => {
+        if (tab.active) {
+          ports.get(tab.id).postMessage({ actionType: EVENTS.TOGGLE_PALETTE })
+        }
+      })
+    })
+  })
 })
-// setTimeout(() => {
-//   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-//     getAllTabs().then(allTabs =>
-//       chrome.tabs.sendMessage(tabs[0].id, {
-//         actionType: EVENTS.GET_TABS,
-//         payload: allTabs
-//       })
-//     )
-//   })
-// }, 11000)

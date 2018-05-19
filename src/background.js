@@ -9,6 +9,8 @@ chrome.runtime.onConnect.addListener(port => {
 
   ports.set(tabId, port)
 
+  port.onDisconnect.addListener(() => ports.delete(tabId))
+
   port.onMessage.addListener(({ actionType, payload }) => {
     switch (actionType) {
       case 'REQUEST_SUGGESTIONS':
@@ -24,10 +26,6 @@ chrome.runtime.onConnect.addListener(port => {
         break
     }
   })
-
-  port.onDisconnect.addListener(() => {
-    ports.delete(tabId)
-  })
 })
 
 chrome.runtime.onMessage.addListener((message, sender) => {
@@ -37,13 +35,9 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   }
 })
 
-chrome.tabs.onRemoved.addListener(tabId => {
-  ports.delete(tabId)
-})
+chrome.tabs.onRemoved.addListener(tabId => ports.delete(tabId))
 
-chrome.tabs.onReplaced.addListener((newTabId, oldTabId) => {
-  ports.delete(oldTabId)
-})
+chrome.tabs.onReplaced.addListener((_, oldTabId) => ports.delete(oldTabId))
 
 // Add Cmd + Shift + A listener
 chrome.commands.onCommand.addListener(() => {

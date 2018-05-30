@@ -13,7 +13,7 @@ chrome.runtime.onConnect.addListener(port => {
 
   port.onMessage.addListener(({ actionType, payload }) => {
     switch (actionType) {
-      case 'REQUEST_SUGGESTIONS':
+      case EVENTS.REQUEST_SUGGESTIONS:
         actions.getAllTabs().then(allTabs =>
           port.postMessage({
             actionType: EVENTS.SUGGESTIONS_UPDATED,
@@ -21,7 +21,9 @@ chrome.runtime.onConnect.addListener(port => {
           })
         )
         break
-
+      case EVENTS.REQUEST_NAVIGATION:
+        actions.navigateToTab(payload)
+        break
       default:
         break
     }

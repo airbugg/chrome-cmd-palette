@@ -14,7 +14,6 @@ port.onMessage.addListener(({ actionType, payload = [] }) => {
       })
       break
     case EVENTS.SUGGESTIONS_UPDATED:
-      console.log(EVENTS.SUGGESTIONS_UPDATED)
       app.ports.consumeResponse.send({
         actionType: EVENTS.SUGGESTIONS_UPDATED,
         payload
@@ -25,10 +24,24 @@ port.onMessage.addListener(({ actionType, payload = [] }) => {
   }
 })
 
-app.ports.sendRequest.subscribe(request => {
-  if (request.actionType === 'REQUEST_SUGGESTIONS') {
-    console.log('inside sendRequest.subscribe in content script', request)
-    port.postMessage({ actionType: EVENTS.REQUEST_SUGGESTIONS, payload: null })
+app.ports.sendRequest.subscribe(({ actionType, payload }) => {
+  switch (actionType) {
+    case 'REQUEST_SUGGESTIONS':
+      port.postMessage({
+        actionType: EVENTS.REQUEST_SUGGESTIONS,
+        payload: null
+      })
+
+      break
+    case 'REQUEST_NAVIGATION':
+      port.postMessage({
+        actionType: EVENTS.REQUEST_NAVIGATION,
+        payload
+      })
+
+      break
+    default:
+      break
   }
 })
 

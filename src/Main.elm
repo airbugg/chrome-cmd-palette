@@ -1,7 +1,9 @@
 port module Main exposing (..)
 
+import Debug
 import Dom
-import Html exposing (..)
+import Dom.Scroll exposing (toBottom)
+import Html exposing (Html)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode exposing (Decoder)
@@ -31,9 +33,10 @@ type alias Suggestion =
     }
 
 
-type ArrowKey
+type ActionKeys
     = Up
     | Down
+    | Enter
 
 
 init : ( Model, Cmd Msg )
@@ -72,7 +75,7 @@ getNextItemId ids selectedId =
     Maybe.withDefault selectedId <| List.foldl (getPrevious selectedId) Nothing ids
 
 
-navigateWithKey : ArrowKey -> List Int -> Maybe Int -> Maybe Int
+navigateWithKey : ActionKeys -> List Int -> Maybe Int -> Maybe Int
 navigateWithKey code ids maybeId =
     case code of
         Up ->
@@ -80,12 +83,15 @@ navigateWithKey code ids maybeId =
 
         Down ->
             Maybe.map (getNextItemId ids) maybeId
+        _ ->
+            Nothing
 
 
 type Msg
     = NoOp
     | TogglePalette
-    | KeyDown ArrowKey
+    | KeyDown ActionKeys
+    | MouseClick Int
     | ResetFilter
     | Blur
     | UpdateFilter String
@@ -106,6 +112,9 @@ update msg model =
                 RequestSuggestions ->
                     model ! [ encodeRequest RequestSuggestions ]
 
+                RequestNavigation tabId ->
+                    model ! [ encodeRequest (RequestNavigation tabId) ]
+
         TogglePalette ->
             { model | showPalette = not model.showPalette }
                 ! [ Task.attempt FocusResult (Dom.focus "command-palette-input") ]
@@ -115,10 +124,21 @@ update msg model =
                 ! []
 
         KeyDown key ->
-            { model
-                | selectedId = navigateWithKey key (List.map (\x -> x.id) model.suggestions) model.selectedId
-            }
-                ! []
+            case key of
+                Enter ->
+                    model ! []
+                _ ->
+                    { model
+                        | selectedId = navigateWithKey key (model.suggestions |> List.map (\x -> x.id)) model.selectedId
+                    }
+                        ! [ "suggestion-"
+                                ++ toString (Maybe.withDefault 0 model.selectedId)
+                                |> Dom.Scroll.toTop
+                                |> Task.attempt FocusResult
+                        ]
+
+        MouseClick id ->
+            model ! []
 
         UpdateFilter str ->
             { model | filterField = str }
@@ -130,7 +150,7 @@ update msg model =
         FocusResult result ->
             case result of
                 Err (Dom.NotFound id) ->
-                    model ! []
+                    { model | error = Just id } ! []
 
                 Ok () ->
                     model ! []
@@ -148,6 +168,7 @@ update msg model =
 
 type OutgoingAction
     = RequestSuggestions
+    | RequestNavigation Int
 
 
 type alias Action =
@@ -173,6 +194,9 @@ encodeRequest action =
     case action of
         RequestSuggestions ->
             sendRequest { actionType = "REQUEST_SUGGESTIONS", payload = Json.Encode.null }
+
+        RequestNavigation tabId ->
+            sendRequest { actionType = "REQUEST_NAVIGATION", payload = Json.Encode.int tabId }
 
 
 decodeResponse : Json.Decode.Value -> Msg
@@ -219,7 +243,7 @@ incomingActionDecoder =
 
 viewInput : Model -> Html Msg
 viewInput { filterField } =
-    input
+    Html.input
         [ class "command-palette-input"
         , placeholder "Start typing to search..."
         , id "command-palette-input"
@@ -233,25 +257,29 @@ viewInput { filterField } =
 
 viewSuggestions : Model -> Html Msg
 viewSuggestions { suggestions, filterField, selectedId } =
-    div [ class "suggestions" ]
+    Html.div [ class "suggestions" ]
         (suggestions
             |> List.filter (\{ title, favIconUrl } -> String.contains (String.toLower filterField) (String.toLower title))
-            |> List.map (viewSuggestion selectedId)
+            |> List.indexedMap (viewSuggestion selectedId)
         )
 
 
-viewSuggestion : Maybe Int -> Suggestion -> Html Msg
-viewSuggestion selectedId suggestion =
-    div [ classList [ ( "suggestion", True ), ( "selected", suggestion.id == Maybe.withDefault 0 selectedId ) ] ]
+viewSuggestion : Maybe Int -> Int -> Suggestion -> Html Msg
+viewSuggestion selectedId suggestionId suggestion =
+    Html.div
+        [ classList [ ( "suggestion", True ), ( "selected", suggestion.id == Maybe.withDefault 0 selectedId ) ]
+        , id ("suggestion-" ++ toString suggestionId)
+        , Html.Events.onClick (HandleRequest (RequestNavigation suggestion.id))
+        ]
         [ viewIcon suggestion
-        , p [] [ text suggestion.title ]
+        , Html.p [] [ Html.text suggestion.title ]
         ]
 
 
 viewIcon : Suggestion -> Html Msg
 viewIcon { favIconUrl } =
-    span [ class "icon-container" ]
-        [ img [ src (getIcon favIconUrl) ] [] ]
+    Html.span [ class "icon-container" ]
+        [ Html.img [ src (getIcon favIconUrl) ] [] ]
 
 
 getIcon : String -> String
@@ -265,7 +293,7 @@ getIcon iconUrl =
 view : Model -> Html Msg
 view model =
     if model.showPalette then
-        div [ classList [ ( "command-palette", True ), ( "empty", List.isEmpty model.suggestions ) ] ]
+        Html.div [ classList [ ( "command-palette", True ), ( "empty", List.isEmpty model.suggestions ) ] ]
             [ viewInput model
             , viewSuggestions model
             ]
@@ -292,6 +320,9 @@ subscriptions model =
 
                     40 ->
                         KeyDown Down
+
+                    13 ->
+                        KeyDown Enter
 
                     _ ->
                         NoOp

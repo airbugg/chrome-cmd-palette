@@ -3,7 +3,7 @@ export const actionFactory = chrome => ({
     return new Promise((resolve, reject) => {
       chrome.tabs.query({}, tabs =>
         resolve(
-          tabs.map(({ title, favIconUrl }, id) => ({
+          tabs.map(({ id, title, favIconUrl }) => ({
             id,
             title,
             favIconUrl: favIconUrl || ''
@@ -11,5 +11,8 @@ export const actionFactory = chrome => ({
         )
       )
     })
+  },
+  navigateToTab (tabId) {
+    chrome.tabs.update(tabId, { active: true })
   }
 })
